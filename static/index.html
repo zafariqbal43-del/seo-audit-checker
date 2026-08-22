@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEO Audit Checker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #F6F7F9;
+    --panel: #FFFFFF;
+    --ink: #14181F;
+    --sub: #5B6472;
+    --navy: #1E3A5F;
+    --line: #E3E7ED;
+    --pass: #2E9E6D;
+    --warn: #C98A00;
+    --fail: #D6483C;
+    --mono-bg: #10151C;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;}
+  .wrap{max-width:900px;margin:0 auto;padding:48px 20px 80px;}
+
+  .masthead{text-align:center;margin-bottom:36px;}
+  .masthead .eyebrow{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:3px;
+    color:var(--navy);text-transform:uppercase;margin:0 0 10px;
+  }
+  .masthead h1{
+    font-family:'Space Grotesk',sans-serif;font-weight:700;
+    font-size:clamp(28px,5vw,42px);margin:0 0 10px;letter-spacing:-0.5px;
+  }
+  .masthead p{color:var(--sub);font-size:15px;margin:0;}
+
+  .scan-form{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:22px;display:flex;gap:10px;box-shadow:0 1px 3px rgba(20,24,31,0.04);
+    margin-bottom:32px;
+  }
+  .scan-form input{
+    flex:1;border:1px solid var(--line);border-radius:8px;padding:13px 14px;
+    font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--ink);
+    background:#FAFBFC;
+  }
+  .scan-form input:focus{outline:2px solid var(--navy);outline-offset:1px;}
+  .scan-form button{
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;
+    background:var(--navy);color:#fff;border:none;border-radius:8px;
+    padding:0 24px;cursor:pointer;letter-spacing:0.3px;
+  }
+  .scan-form button:hover{background:#16304F;}
+  .scan-form button:disabled{background:#9AA5B1;cursor:default;}
+
+  .connectors{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px;}
+  .connector-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+  }
+  .connector-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;}
+  .connector-name{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;}
+  .connector-status{
+    font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.5px;
+    padding:3px 9px;border-radius:20px;background:#EEF1F5;color:var(--sub);text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .connector-status.on{background:#E4F5EC;color:var(--pass);}
+  .connector-status.off{background:#FCEEEC;color:var(--fail);}
+  .connector-desc{font-size:12.5px;color:var(--sub);margin:0 0 12px;line-height:1.4;}
+  .connector-btn{
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12.5px;
+    background:var(--navy);color:#fff;border:none;border-radius:7px;padding:7px 14px;cursor:pointer;
+  }
+  .connector-btn.disconnect{background:transparent;color:var(--fail);border:1px solid var(--fail);}
+  .apikey-form{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
+  .apikey-form input{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 10px;
+    border:1px solid var(--line);border-radius:6px;background:#FAFBFC;
+  }
+
+  .banner{
+    display:none;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:20px;
+  }
+  .banner.error{display:block;background:#FCEEEC;color:#7A2A22;border:1px solid var(--fail);}
+  .banner.success{display:block;background:#E4F5EC;color:#1F5C3D;border:1px solid var(--pass);}
+
+  .integration-panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px;
+  }
+  .integration-panel h3{font-family:'Space Grotesk',sans-serif;font-size:15px;margin:0 0 12px;}
+  .integration-panel .stat-row{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:10px;}
+  .integration-panel .stat{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--sub);}
+  .integration-panel .stat b{color:var(--ink);font-size:15px;display:block;}
+  .integration-panel table{width:100%;border-collapse:collapse;font-size:13px;}
+  .integration-panel th{text-align:left;font-size:11px;color:var(--sub);padding:6px 8px;border-bottom:1px solid var(--line);}
+  .integration-panel td{padding:6px 8px;border-bottom:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+  .serp-row{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);align-items:baseline;}
+  .serp-row:last-child{border-bottom:none;}
+  .serp-pos{font-family:'IBM Plex Mono',monospace;color:var(--sub);font-size:12px;width:20px;flex-shrink:0;}
+  .serp-info a{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:13.5px;color:var(--navy);text-decoration:none;}
+  .serp-info a:hover{text-decoration:underline;}
+  .serp-info .domain{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--sub);}
+  .difficulty-badge{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;
+    padding:4px 10px;border-radius:20px;background:#EEF1F5;color:var(--navy);display:inline-block;margin-bottom:10px;
+  }
+  .fn-category{margin-bottom:10px;}
+  .fn-category .fn-label{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.5px;color:var(--sub);
+    text-transform:uppercase;margin-bottom:4px;
+  }
+  .fn-category .fn-body{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink);
+    background:#FAFBFC;border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+    white-space:pre-wrap;max-height:180px;overflow:auto;}
+  .fn-unavailable{font-size:12px;color:var(--sub);font-style:italic;}
+
+  /* Scanning state */
+  .scanning{
+    background:var(--mono-bg);border-radius:14px;padding:40px 20px;text-align:center;
+    font-family:'IBM Plex Mono',monospace;color:#B8C4D6;letter-spacing:1px;margin-bottom:32px;
+    display:none;
+  }
+  .scanning .bar{width:260px;height:3px;background:#22304A;margin:16px auto 0;overflow:hidden;border-radius:2px;}
+  .scanning .bar span{display:block;width:40%;height:100%;background:#4FA3E3;animation:sweep 1.1s ease-in-out infinite;}
+  @keyframes sweep{0%{transform:translateX(-100%);}100%{transform:translateX(350%);}}
+
+  /* Error */
+  .error-box{
+    background:#FCEEEC;border:1px solid var(--fail);border-radius:12px;
+    padding:18px 20px;color:#7A2A22;font-size:14px;margin-bottom:32px;display:none;
+  }
+
+  /* Report */
+  #report{display:none;}
+  .certificate{
+    background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:32px;margin-bottom:24px;display:grid;grid-template-columns:auto 1fr;gap:28px;
+    align-items:center;box-shadow:0 1px 3px rgba(20,24,31,0.04);
+  }
+  .grade-badge{
+    width:110px;height:110px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:42px;color:#fff;
+    border:4px solid rgba(0,0,0,0.06);flex-shrink:0;
+    transform:rotate(-4deg);
+  }
+  .cert-details h2{
+    font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--sub);
+    margin:0 0 6px;word-break:break-all;
+  }
+  .cert-details .titletext{
+    font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:19px;margin:0 0 10px;
+  }
+  .cert-stats{display:flex;gap:18px;flex-wrap:wrap;}
+  .cert-stats .stat{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--sub);}
+  .cert-stats .stat b{color:var(--ink);font-size:14px;display:block;}
+
+  .category{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    margin-bottom:16px;overflow:hidden;
+  }
+  .category h3{
+    font-family:'Space Grotesk',sans-serif;font-size:15px;margin:0;
+    padding:14px 20px;border-bottom:1px solid var(--line);background:#FAFBFC;
+  }
+  .check-row{
+    display:flex;align-items:flex-start;gap:12px;padding:13px 20px;
+    border-bottom:1px solid var(--line);
+  }
+  .check-row:last-child{border-bottom:none;}
+  .dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+  .dot.pass{background:var(--pass);}
+  .dot.warn{background:var(--warn);}
+  .dot.fail{background:var(--fail);}
+  .check-text .label{font-size:14px;font-weight:500;}
+  .check-text .detail{font-size:12.5px;color:var(--sub);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+
+  .keywords{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;
+  }
+  .keywords h3{font-family:'Space Grotesk',sans-serif;font-size:15px;margin:0 0 12px;}
+  .kw-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .kw-chip{
+    font-family:'IBM Plex Mono',monospace;font-size:12px;background:#EEF1F5;
+    border-radius:20px;padding:5px 12px;color:var(--navy);
+  }
+  .kw-chip b{color:var(--ink);}
+
+  footer{text-align:center;margin-top:40px;font-size:12px;color:var(--sub);font-family:'IBM Plex Mono',monospace;}
+
+  @media (max-width:600px){
+    .scan-form{flex-direction:column;}
+    .certificate{grid-template-columns:1fr;text-align:center;}
+    .grade-badge{margin:0 auto;}
+    .cert-stats{justify-content:center;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <p class="eyebrow">Free On-Page SEO Inspection</p>
+    <h1>SEO Audit Checker</h1>
+    <p>Paste a URL. Get a real, graded inspection of its on-page SEO — no signup.</p>
+  </div>
+
+  <div class="scan-form">
+    <input id="urlInput" type="text" placeholder="https://example.com/page/" value="">
+    <button id="scanBtn" onclick="runAudit()">Run Audit</button>
+  </div>
+
+  <div class="connectors" id="connectors">
+    <!-- populated by renderConnectors() -->
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+  <div class="scanning" id="scanning">
+    INSPECTING PAGE<span id="dots">…</span>
+    <div class="bar"><span></span></div>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <div id="report"></div>
+
+  <footer>Checks meta tags, headings, content length, images, links, and structured data. Figures are estimates based on the fetched HTML.</footer>
+</div>
+
+<script>
+  const gradeColors = {
+    "A+": "#2E9E6D", "A": "#2E9E6D", "B": "#4C8FBF",
+    "C": "#C98A00", "D": "#D6483C", "F": "#B33328"
+  };
+
+  function fmt(n){ return Number(n).toLocaleString('en-US'); }
+
+  async function runAudit(){
+    const input = document.getElementById('urlInput');
+    const url = input.value.trim();
+    if(!url){ input.focus(); return; }
+
+    document.getElementById('report').style.display = 'none';
+    document.getElementById('errorBox').style.display = 'none';
+    document.getElementById('scanning').style.display = 'block';
+    document.getElementById('scanBtn').disabled = true;
+
+    try{
+      const res = await fetch('/api/audit?url=' + encodeURIComponent(url));
+      const data = await res.json();
+      if(!res.ok || data.error){
+        throw new Error(data.error || 'Audit failed.');
+      }
+      render(data);
+    }catch(err){
+      const box = document.getElementById('errorBox');
+      box.textContent = err.message || 'Something went wrong.';
+      box.style.display = 'block';
+    }finally{
+      document.getElementById('scanning').style.display = 'none';
+      document.getElementById('scanBtn').disabled = false;
+    }
+  }
+
+  document.getElementById('urlInput').addEventListener('keydown', e => {
+    if(e.key === 'Enter') runAudit();
+  });
+
+  // ---- Generic connector rendering ----
+  let PROVIDERS = [];
+
+  function connectorCardHtml(p){
+    if(p.kind === 'mcp_oauth'){
+      return `
+        <div class="connector-card" data-provider="${p.id}" data-kind="mcp_oauth">
+          <div class="connector-head">
+            <span class="connector-name">${p.label}</span>
+            <span class="connector-status" data-role="status">…</span>
+          </div>
+          <p class="connector-desc">${p.description}</p>
+          <button class="connector-btn" data-role="btn">Connect</button>
+        </div>`;
+    }
+    // api_key
+    const inputs = p.fields.map(f =>
+      `<input type="${f.secret ? 'password' : 'text'}" data-field="${f.name}" placeholder="${f.label}">`
+    ).join('');
+    return `
+      <div class="connector-card" data-provider="${p.id}" data-kind="api_key">
+        <div class="connector-head">
+          <span class="connector-name">${p.label}</span>
+          <span class="connector-status" data-role="status">…</span>
+        </div>
+        <p class="connector-desc">${p.description}</p>
+        <div class="apikey-form" data-role="form">${inputs}</div>
+        <button class="connector-btn" data-role="btn">Connect</button>
+      </div>`;
+  }
+
+  async function loadProvidersAndRender(){
+    PROVIDERS = await (await fetch('/api/providers')).json();
+    const container = document.getElementById('connectors');
+    container.innerHTML =
+      `<div class="connector-card" data-provider="__google" data-kind="google">
+        <div class="connector-head">
+          <span class="connector-name">Google Search Console</span>
+          <span class="connector-status" data-role="status">…</span>
+        </div>
+        <p class="connector-desc">Real clicks, impressions, CTR and position for the audited page.</p>
+        <button class="connector-btn" data-role="btn">Connect</button>
+      </div>` +
+      PROVIDERS.map(connectorCardHtml).join('');
+
+    container.querySelectorAll('.connector-card').forEach(card => {
+      const kind = card.dataset.kind;
+      const pid = card.dataset.provider;
+      const btn = card.querySelector('[data-role="btn"]');
+      if(kind === 'google'){
+        btn.addEventListener('click', () => { window.location.href = '/auth/google/start'; });
+      } else if(kind === 'mcp_oauth'){
+        btn.addEventListener('click', () => {
+          if(btn.dataset.connected === '1'){
+            fetch(`/auth/mcp/${pid}/disconnect`, {method:'POST'}).then(refreshConnectorStatus);
+          } else {
+            window.location.href = `/auth/mcp/${pid}/start`;
+          }
+        });
+      } else if(kind === 'api_key'){
+        btn.addEventListener('click', async () => {
+          if(btn.dataset.connected === '1'){
+            await fetch(`/auth/apikey/${pid}/disconnect`, {method:'POST'});
+            refreshConnectorStatus();
+            return;
+          }
+          const values = {};
+          card.querySelectorAll('[data-field]').forEach(inp => { values[inp.dataset.field] = inp.value.trim(); });
+          if(Object.values(values).some(v => !v)){ return; }
+          await fetch(`/auth/apikey/${pid}/connect`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(values)
+          });
+          refreshConnectorStatus();
+        });
+      }
+    });
+
+    refreshConnectorStatus();
+  }
+
+  async function refreshConnectorStatus(){
+    const container = document.getElementById('connectors');
+    for(const card of container.querySelectorAll('.connector-card')){
+      const kind = card.dataset.kind;
+      const pid = card.dataset.provider;
+      const statusEl = card.querySelector('[data-role="status"]');
+      const btn = card.querySelector('[data-role="btn"]');
+      const formEl = card.querySelector('[data-role="form"]');
+      try{
+        let s;
+        if(kind === 'google'){
+          s = await (await fetch('/api/google/status')).json();
+          if(!s.configured){
+            statusEl.textContent = 'Not set up'; statusEl.className = 'connector-status';
+            btn.textContent = 'Not available'; btn.disabled = true;
+            continue;
+          }
+        } else if(kind === 'mcp_oauth'){
+          s = await (await fetch(`/api/mcp/${pid}/status`)).json();
+        } else {
+          s = await (await fetch(`/api/apikey/${pid}/status`)).json();
+        }
+        if(s.connected){
+          statusEl.textContent = 'Connected'; statusEl.className = 'connector-status on';
+          btn.textContent = 'Disconnect'; btn.className = 'connector-btn disconnect';
+          btn.dataset.connected = '1';
+          if(formEl) formEl.style.display = 'none';
+        } else {
+          statusEl.textContent = s.busy ? 'Connecting…' : 'Not connected';
+          statusEl.className = 'connector-status' + (s.busy ? '' : ' off');
+          btn.textContent = 'Connect'; btn.className = 'connector-btn';
+          btn.dataset.connected = '0';
+          if(formEl) formEl.style.display = 'flex';
+        }
+      }catch(e){}
+    }
+  }
+
+  function showBanner(msg, kind){
+    const b = document.getElementById('banner');
+    b.textContent = msg;
+    b.className = 'banner ' + kind;
+  }
+
+  (function checkUrlBanners(){
+    const params = new URLSearchParams(window.location.search);
+    if(params.get('google_error')) showBanner('Google Search Console: ' + params.get('google_error'), 'error');
+    else if(params.get('google_connected')) showBanner('Google Search Console connected.', 'success');
+    else if(params.get('connector_error')) showBanner('Connection failed: ' + params.get('connector_error'), 'error');
+    else if(params.get('connector_connected')) showBanner(params.get('connector_connected') + ' connected.', 'success');
+    if(window.history.replaceState) window.history.replaceState({}, '', window.location.pathname);
+  })();
+
+  loadProvidersAndRender();
+
+  // ---- Provider data, appended after an audit runs ----
+  async function loadIntegrations(pageUrl, topKeyword){
+    const container = document.createElement('div');
+    container.id = 'integrationsBlock';
+    document.getElementById('report').appendChild(container);
+
+    const gStatus = await (await fetch('/api/google/status')).json();
+    if(gStatus.connected){
+      try{
+        const perf = await (await fetch('/api/gsc/performance?url=' + encodeURIComponent(pageUrl))).json();
+        if(perf.error){
+          container.innerHTML += `<div class="integration-panel"><h3>Google Search Console</h3><p class="detail">${perf.error}</p></div>`;
+        } else {
+          const rows = perf.queries.map(q =>
+            `<tr><td>${q.query}</td><td>${q.clicks}</td><td>${q.impressions}</td><td>${q.ctr}%</td><td>${q.position}</td></tr>`
+          ).join('');
+          container.innerHTML += `
+            <div class="integration-panel">
+              <h3>Google Search Console — ${perf.date_range}</h3>
+              <div class="stat-row">
+                <div class="stat"><b>${perf.clicks}</b>Clicks</div>
+                <div class="stat"><b>${perf.impressions}</b>Impressions</div>
+                <div class="stat"><b>${perf.ctr}%</b>CTR</div>
+                <div class="stat"><b>${perf.position}</b>Avg. position</div>
+              </div>
+              <table><tr><th>Query</th><th>Clicks</th><th>Impr.</th><th>CTR</th><th>Position</th></tr>${rows || '<tr><td colspan="5" class="detail">No query data for this page yet.</td></tr>'}</table>
+            </div>`;
+        }
+      }catch(e){}
+    }
+
+    if(!topKeyword) return;
+
+    // ---- SERP + keyword difficulty (prefers a connected provider's own SERP tool, else scrapes) ----
+    try{
+      const serp = await (await fetch(`/api/serp?keyword=${encodeURIComponent(topKeyword)}&url=${encodeURIComponent(pageUrl)}`)).json();
+      if(serp.error){
+        container.innerHTML += `<div class="integration-panel"><h3>SERP & Keyword Difficulty</h3><p class="detail">${serp.error}</p></div>`;
+      } else {
+        const diffHtml = serp.difficulty !== null && serp.difficulty !== undefined
+          ? `<span class="difficulty-badge">Difficulty: ${serp.difficulty} <span style="font-weight:400;color:var(--sub);">(${serp.difficulty_source})</span></span>`
+          : '';
+        const rows = Array.isArray(serp.results) ? serp.results.map(r => `
+          <div class="serp-row">
+            <div class="serp-pos">${r.position ?? ''}</div>
+            <div class="serp-info">
+              <div><a href="${r.url}" target="_blank" rel="noopener">${r.title || r.url}</a></div>
+              <div class="domain">${r.domain || ''}</div>
+            </div>
+          </div>`).join('') : `<div class="fn-body">${JSON.stringify(serp.results, null, 2)}</div>`;
+        container.innerHTML += `
+          <div class="integration-panel">
+            <h3>SERP & Keyword Difficulty — "${topKeyword}"</h3>
+            <p class="connector-desc" style="margin-bottom:10px;">Source: ${serp.serp_source}${serp.scraped_fallback ? ' — best-effort scrape; connect Ahrefs or Semrush for reliable SERP data.' : ''}</p>
+            ${diffHtml}
+            ${rows}
+          </div>`;
+      }
+    }catch(e){}
+
+    // ---- Richer per-provider functions: backlinks, domain overview, rank tracking, competitor gap ----
+    const categoryLabels = {
+      keyword_data: "Keyword Data", keyword_difficulty: "Keyword Difficulty",
+      backlinks: "Backlinks", domain_overview: "Domain Overview",
+      rank_tracking: "Rank Tracking", competitor_gap: "Competitor Gap",
+    };
+
+    for(const p of PROVIDERS){
+      const statusUrl = p.kind === 'mcp_oauth' ? `/api/mcp/${p.id}/status` : `/api/apikey/${p.id}/status`;
+      let s;
+      try{ s = await (await fetch(statusUrl)).json(); }catch(e){ continue; }
+      if(!s.connected) continue;
+
+      if(p.kind === 'api_key'){
+        if(p.role === 'serp') continue; // already shown in the SERP & Keyword Difficulty panel above
+        try{
+          const kw = await (await fetch(`/api/apikey/${p.id}/keywords?keyword=${encodeURIComponent(topKeyword)}`)).json();
+          container.innerHTML += `
+            <div class="integration-panel">
+              <h3>${p.label} — "${topKeyword}"</h3>
+              <div class="fn-body">${JSON.stringify(kw, null, 2)}</div>
+            </div>`;
+        }catch(e){}
+        continue;
+      }
+
+      try{
+        const fns = await (await fetch(`/api/mcp/${p.id}/functions?url=${encodeURIComponent(pageUrl)}&keyword=${encodeURIComponent(topKeyword)}`)).json();
+        let body = '';
+        for(const [cat, label] of Object.entries(categoryLabels)){
+          const outcome = fns[cat];
+          if(!outcome || !outcome.available){
+            body += `<div class="fn-category"><div class="fn-label">${label}</div><div class="fn-unavailable">Not available on this account.</div></div>`;
+          } else if(outcome.error){
+            body += `<div class="fn-category"><div class="fn-label">${label} (${outcome.tool})</div><div class="fn-unavailable">${outcome.error}</div></div>`;
+          } else {
+            body += `<div class="fn-category"><div class="fn-label">${label} (${outcome.tool})</div><div class="fn-body">${JSON.stringify(outcome.result, null, 2)}</div></div>`;
+          }
+        }
+        container.innerHTML += `<div class="integration-panel"><h3>${p.label}</h3>${body}</div>`;
+      }catch(e){}
+    }
+  }
+
+  function render(data){
+    const color = gradeColors[data.grade] || '#5B6472';
+
+    const categories = {};
+    data.checks.forEach(c => {
+      (categories[c.category] = categories[c.category] || []).push(c);
+    });
+
+    let categoriesHtml = '';
+    for(const [cat, rows] of Object.entries(categories)){
+      categoriesHtml += `<div class="category"><h3>${cat}</h3>`;
+      rows.forEach(c => {
+        categoriesHtml += `
+          <div class="check-row">
+            <div class="dot ${c.status}"></div>
+            <div class="check-text">
+              <div class="label">${c.label}</div>
+              <div class="detail">${c.detail}</div>
+            </div>
+          </div>`;
+      });
+      categoriesHtml += `</div>`;
+    }
+
+    const kwHtml = data.keywords.map(k =>
+      `<span class="kw-chip"><b>${k.word}</b> ×${k.count}</span>`
+    ).join('');
+
+    document.getElementById('report').innerHTML = `
+      <div class="certificate">
+        <div class="grade-badge" style="background:${color};">${data.grade}</div>
+        <div class="cert-details">
+          <h2>${data.url}</h2>
+          <div class="titletext">${data.title || '(no title tag)'}</div>
+          <div class="cert-stats">
+            <div class="stat"><b>${data.score}/100</b>Score</div>
+            <div class="stat"><b>${fmt(data.word_count)}</b>Words</div>
+            <div class="stat"><b>${data.internal_links}</b>Internal links</div>
+            <div class="stat"><b>${data.external_links}</b>External links</div>
+            <div class="stat"><b>${data.missing_alt}/${data.images}</b>Missing ALT</div>
+          </div>
+        </div>
+      </div>
+      ${categoriesHtml}
+      <div class="keywords">
+        <h3>Top keyword signals</h3>
+        <div class="kw-chips">${kwHtml || '<span class="detail">No significant keywords found.</span>'}</div>
+      </div>
+    `;
+    document.getElementById('report').style.display = 'block';
+
+    const topKeyword = data.keywords.length ? data.keywords[0].word : null;
+    loadIntegrations(data.url, topKeyword);
+  }
+</script>
+</body>
+</html>
