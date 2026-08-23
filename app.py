@@ -239,6 +239,19 @@ def google_disconnect(request: Request):
     return {"ok": True}
 
 
+@app.post("/admin/google-config")
+async def admin_google_config(request: Request):
+    """Site owner pastes their Google OAuth Client ID/Secret here instead of
+    editing host environment variables. Applies immediately, no redeploy."""
+    body = await request.json()
+    client_id = (body.get("client_id") or "").strip()
+    client_secret = (body.get("client_secret") or "").strip()
+    if not client_id or not client_secret:
+        return JSONResponse({"error": "Both Client ID and Client Secret are required."}, status_code=400)
+    gsc_auth.set_runtime_credentials(client_id, client_secret)
+    return {"ok": True}
+
+
 @app.get("/api/gsc/performance")
 def gsc_performance(request: Request, url: str = Query(...)):
     creds = request.session.get("google_creds")
@@ -479,3 +492,4 @@ async def serp_route(request: Request, keyword: str = Query(...), url: str = Que
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
