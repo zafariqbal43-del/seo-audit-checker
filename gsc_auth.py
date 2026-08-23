@@ -1,15 +1,20 @@
 """
 Google Search Console OAuth — each visitor connects THEIR OWN GSC account.
 
-Requires the site owner to set up a Google Cloud OAuth Client (one-time):
+Unlike Ubersuggest/Ahrefs, Google requires the SITE OWNER to register an
+OAuth client in advance (Google doesn't support anonymous dynamic client
+registration). One-time setup:
   1. https://console.cloud.google.com/ -> create/select a project
   2. Enable the "Google Search Console API"
   3. OAuth consent screen -> configure (External is fine for testing)
   4. Credentials -> Create OAuth Client ID -> Web application
   5. Add an Authorized redirect URI:  <YOUR_BASE_URL>/auth/google/callback
-  6. Set env vars: GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, BASE_URL
+  6. Either set env vars (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET)
+     on your host, OR paste the Client ID/Secret directly into the app's
+     Google card — it'll call set_runtime_credentials() below, no redeploy
+     needed. Runtime values take priority over env vars if both are set.
 
-Without those env vars set, the Google connect button will return a clear
+Without either of those set, the Google connect button returns a clear
 "not configured" error instead of connecting.
 """
 import os
@@ -19,16 +24,38 @@ from googleapiclient.discovery import build
 
 SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
 BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:8000")
-CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
-CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
+_ENV_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+_ENV_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
+
+# Runtime-set credentials (via the app's own "Configure" form) take priority
+# over env vars, and persist only for as long as this process runs — a
+# redeploy/restart clears them back to whatever the env vars say. This is a
+# convenience for site owners who'd rather paste credentials once in the UI
+# than edit their host's environment variables.
+_runtime_client_id: str | None = None
+_runtime_client_secret: str | None = None
 
 # Flows in flight, keyed by the OAuth `state` param, so the callback can
 # reconstruct the exact flow that started it.
 _PENDING_FLOWS: dict[str, Flow] = {}
 
 
+def set_runtime_credentials(client_id: str, client_secret: str) -> None:
+    global _runtime_client_id, _runtime_client_secret
+    _runtime_client_id = client_id.strip()
+    _runtime_client_secret = client_secret.strip()
+
+
+def get_client_id() -> str:
+    return _runtime_client_id or _ENV_CLIENT_ID
+
+
+def get_client_secret() -> str:
+    return _runtime_client_secret or _ENV_CLIENT_SECRET
+
+
 def is_configured() -> bool:
-    return bool(CLIENT_ID and CLIENT_SECRET)
+    return bool(get_client_id() and get_client_secret())
 
 
 def _redirect_uri() -> str:
@@ -38,8 +65,8 @@ def _redirect_uri() -> str:
 def _client_config() -> dict:
     return {
         "web": {
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
+            "client_id": get_client_id(),
+            "client_secret": get_client_secret(),
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
             "redirect_uris": [_redirect_uri()],
@@ -52,8 +79,9 @@ def start_auth() -> str:
     if not is_configured():
         raise RuntimeError(
             "Google Search Console isn't configured on this server yet. "
-            "The site owner needs to set GOOGLE_OAUTH_CLIENT_ID and "
-            "GOOGLE_OAUTH_CLIENT_SECRET (see gsc_auth.py docstring)."
+            "The site owner needs to enter a Client ID and Client Secret "
+            "(see the Google card's Configure form, or set "
+            "GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET env vars)."
         )
     flow = Flow.from_client_config(_client_config(), scopes=SCOPES, redirect_uri=_redirect_uri())
     auth_url, state = flow.authorization_url(
